@@ -1,5 +1,3 @@
-#! /usr/bin/env -S deno run --allow-net
-
 import { Observable, Subscriber } from "rxjs";
 
 
