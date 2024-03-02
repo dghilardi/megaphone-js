@@ -14,8 +14,13 @@ interface StreamSpec<T> {
     finalizer: (msg: Chunk<T>) => boolean;
 }
 
+export interface ChannelAddress {
+    producer: string,
+    consumer: string,
+}
+
 export class MegaphonePoller {
-    private channelId?: string;
+    private channelAddress?: ChannelAddress;
     private streams: Array<StreamSpec<unknown>> = [];
     private eventIdBufferIdx = 0;
     private eventIdBuffer: string[];
@@ -26,11 +31,11 @@ export class MegaphonePoller {
         this.eventIdBuffer = new Array(bufferLength);
     }
 
-    async spawnReader(channelId: string): Promise<void> {
-        this.channelId = channelId;
+    async spawnReader(channelAddress: ChannelAddress): Promise<void> {
+        this.channelAddress = channelAddress;
         try {
             while (this.streams.length > 0) {
-                await fetch(`${this.baseUrl}/read/${this.channelId}`)
+                await fetch(`${this.baseUrl}/read/${this.channelAddress?.consumer}`)
                     .then(async (resp) => {
                         if (!resp.ok) {
                             throw new Error("HTTP status code: " + resp.status);
@@ -70,15 +75,15 @@ export class MegaphonePoller {
             }
             this.streams = [];
         } finally {
-            this.channelId = undefined;
+            this.channelAddress = undefined;
         }
     }
 
     async newStream<T>(
-            factory: (channelId?: string) => Promise<{ channelId: string, streamIds: string[] }>,
+            factory: (producerAddress?: string) => Promise<{ channelAddress?: ChannelAddress, streamIds: string[] }>,
             finalizer: (streamId: string, message: Chunk<T>) => boolean,
         ): Promise<Observable<Chunk<T>>> {
-        const { channelId, streamIds } = await factory(this.channelId);
+        const { channelAddress, streamIds } = await factory(this.channelAddress?.producer);
         return new Observable<Chunk<T>>(subscriber => {
             for (const streamId of streamIds) {
                 const stream = { 
@@ -88,21 +93,21 @@ export class MegaphonePoller {
                 };
                 this.streams.push(stream);
             }
-            if (!this.channelId) {
-                this.spawnReader(channelId);
+            if (!this.channelAddress && channelAddress) {
+                this.spawnReader(channelAddress);
             }
             return () => { this.streams = this.streams.filter(({ stream }) => !streamIds.includes(stream)) }
         });
     }
 
     async newUnboundedStream<T>(
-        factory: (channelId?: string) => Promise<{ channelId: string, streamIds: string[] }>,
+        factory: (producerAddress?: string) => Promise<{ channelAddress?: ChannelAddress, streamIds: string[] }>,
     ): Promise<Observable<Chunk<T>>> {
         return await this.newStream(factory, () => true);
     }
 
     async newDelayedResponse<T>(
-        factory: (channelId?: string) => Promise<{ channelId: string, streamIds: string[] }>,
+        factory: (producerAddress?: string) => Promise<{ channelAddress?: ChannelAddress, streamIds: string[] }>,
     ): Promise<Observable<Chunk<T>>> {
         return await this.newStream(factory, () => false);
     }
