@@ -1,6 +1,6 @@
 {
   "name": "megaphone-client",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": "Client library to subscribe megaphone channels",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
