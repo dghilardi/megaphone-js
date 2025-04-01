@@ -45,6 +45,10 @@ export class MegaphonePoller {
                             .getReader();
 
                         while (true) {
+                            if (this.streams.length === 0) {
+                                await reader.cancel('No active subscriptions');
+                                break;
+                            }
                             const { value, done } = await reader.read();
                             if (done) break;
                             value
